@@ -1,19 +1,29 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import sys
-import json
-import optparse
-import telegram
-import requests
-import logging
-import leveldb
+import collections
 import hashlib
+import json
+import leveldb
+import logging
+import optparse
+import requests
+import sys
+import telegram
 
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 
-db = leveldb.LevelDB('./yachdb')
-tkn = '221149518:AAEV-mHu0L0LjQo_TK6E__fTomA94cpTKTE'
+YachBotConfiguration = collections.namedtuple("YachBotConfiguration", "db_location token")
+def read_configuration(configuration_file):
+    from ConfigParser import ConfigParser
+    cp = ConfigParser()
+    if configuration_file in cp.read([configuration_file]):
+        db_location = cp.get("bot", "db_dir")
+        token = cp.get("bot", "telegram_token")
+        return YachBotConfiguration(db_location, token)
+
+CONFIG = read_configuration("./yachbot.cfg")
+DB = leveldb.LevelDB(CONFIG.db_location)
 
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -33,7 +43,7 @@ def log_info(text):
 def getRoomHistorySize(room_id):
     room_size = "size_%s" % room_id
     try:
-        return int(db.Get(room_size))
+        return int(DB.Get(room_size))
     except:
         return 0
 
@@ -41,20 +51,20 @@ def incRoomHistorySize(room_id):
     room_size = "size_%s" % room_id
     try:
         rs = getRoomHistorySize(room_id)
-        db.Put(room_size, str(rs + 1))
+        DB.Put(room_size, str(rs + 1))
     except:
         pass
 
 def getRoomByChat(update):
     try:
         chat_name = "chat_%d" % update.message.chat_id
-        return db.Get(chat_name)
+        return DB.Get(chat_name)
     except:
         return None
 
 def getChatsByRoom(room_name):
     try:
-        return db.Get(room_name).split()
+        return DB.Get(room_name).split()
     except:
         return []
 
@@ -63,7 +73,7 @@ def room(bot, update):
     chat_name = "chat_%d" % update.message.chat_id
 
     try:
-        chat_idx = db.Get(room_name).split()
+        chat_idx = DB.Get(room_name).split()
     except:
         chat_idx = []
 
@@ -72,8 +82,8 @@ def room(bot, update):
 
     exitroom(bot, update)
     chat_idx.append(str(update.message.chat_id))
-    db.Put(room_name, ' '.join(chat_idx))
-    db.Put(chat_name, room_name)
+    DB.Put(room_name, ' '.join(chat_idx))
+    DB.Put(chat_name, room_name)
 
     ping(bot, update)
     try:
@@ -85,11 +95,11 @@ def room(bot, update):
 def exitroom(bot, update):
     try:
         chat_name = "chat_%d" % update.message.chat_id
-        room_name = db.Get(chat_name)
-        db.Delete(chat_name)
-        chat_idx = db.Get(room_name).split()
+        room_name = DB.Get(chat_name)
+        DB.Delete(chat_name)
+        chat_idx = DB.Get(room_name).split()
         chat_idx.remove(str(update.message.chat_id))
-        db.Put(room_name, ' '.join(chat_idx))
+        DB.Put(room_name, ' '.join(chat_idx))
     except:
         pass
 
@@ -143,7 +153,7 @@ def echo(bot, update):
 
     try:
         history_record = "message_%d_%s" % (rs, room_id)
-        db.Put(history_record, message_text.encode('utf-8'))
+        DB.Put(history_record, message_text.encode('utf-8'))
         incRoomHistorySize(room_id)
     except Exception as e:
         error(bot, update, e.text)
@@ -157,7 +167,7 @@ def history(bot, update):
         startid = max(0, rs - historysz)
         for mess in range(startid, rs):
             history_record = "message_%d_%s" % (mess, room_id)
-            bot.sendMessage(update.message.chat_id, text=db.Get(history_record).decode('utf-8'))
+            bot.sendMessage(update.message.chat_id, text=DB.Get(history_record).decode('utf-8'))
     except:
         error(bot, update, "History")
 
@@ -165,7 +175,7 @@ def error(bot, update, error):
     logger.warn('Update "%s" caused error "%s"' % (update, error))
 
 def yachbot():
-    updater = Updater(tkn)
+    updater = Updater(CONFIG.token)
     dp = updater.dispatcher
     dp.add_handler(CommandHandler("room", room))
     dp.add_handler(CommandHandler("help", helpcommand))
