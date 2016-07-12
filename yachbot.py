@@ -69,6 +69,13 @@ def getChatsByRoom(room_name):
         return []
 
 def room(bot, update):
+    if update.message.text == "/room":
+        try:
+            bot.sendMessage(update.message.chat_id, text="Please specify the /room name")
+        except:
+            pass
+        return
+
     room_name = "room_%s" % update.message.text
     chat_name = "chat_%d" % update.message.chat_id
 
@@ -135,12 +142,6 @@ def echo(bot, update):
         return
 
     rs = getRoomHistorySize(room_id)
-    try:
-        if u"ты заебал" in update.message.text:
-            log_info("Max: %s, %s %s" % (update.message.from_user.username, update.message.from_user.first_name, update.message.from_user.last_name))
-    except:
-        pass
-
     message_text = "#%d: %s" % (rs, update.message.text)
 
     chat_idx = sorted(set(getChatsByRoom(room_id)))
