@@ -36,6 +36,14 @@ def ParseArgs():
     return parser.parse_args()
 
 #######################################
+#
+# database keys:
+## size_{room_id} - number of messages in room
+## chat_{chat_id} - current room for given companion
+## room_{room_nm} - list (space separated) of listeners for room 
+## message_{index}_{room_id} - message #index in specific room
+#
+#######################################
 
 def log_info(text):
     logger.warn(text)
