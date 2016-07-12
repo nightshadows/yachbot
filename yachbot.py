@@ -93,11 +93,6 @@ def room(bot, update):
     DB.Put(chat_name, room_name)
 
     ping(bot, update)
-    try:
-        log_info("User %s, %s %s joined channel %s" % (update.message.from_user.username, update.message.from_user.first_name, update.message.from_user.last_name, update.message.text))
-    except Exception as e:
-        print e
-
 
 def exitroom(bot, update):
     try:
