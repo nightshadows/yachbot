@@ -141,9 +141,14 @@ def echo(bot, update):
 
     chat_idx = sorted(set(getChatsByRoom(room_id)))
     for chat_id in chat_idx:
-        if update.message.chat_id != int(chat_id):
+        if (update.message.chat_id != int(chat_id)) or (room_id == "room_/room test"):
             try:
-                bot.sendMessage(int(chat_id), text=message_text)
+                if update.message.sticker:
+                    bot.sendSticker(int(chat_id), sticker=update.message.sticker.file_id)
+                elif update.message.photo:
+                    bot.sendPhoto(int(chat_id), photo=update.message.photo[0].file_id)
+                else:
+                    bot.sendMessage(int(chat_id), text=message_text)
             except:
                 pass
 
