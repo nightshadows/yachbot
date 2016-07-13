@@ -40,7 +40,7 @@ def ParseArgs():
 # database keys:
 ## size_{room_id} - number of messages in room
 ## chat_{chat_id} - current room for given companion
-## room_{room_nm} - list (space separated) of listeners for room 
+## room_{room_nm} - list (space separated) of listeners for room
 ## message_{index}_{room_id} - message #index in specific room
 #
 #######################################
@@ -146,6 +146,10 @@ def echo(bot, update):
 
     rs = getRoomHistorySize(room_id)
     message_text = "#%d: %s" % (rs, update.message.text)
+
+    zaebalEgg = u'ты заебал'
+    if zaebalEgg in message_text:
+        message_text = u"СЛУЖЕБНОЕ СООБЩЕНИЕ #%d: Михаил пытался написать текст 'ты заебал'. Как же ты заебал, Михаил!" % rs
 
     chat_idx = sorted(set(getChatsByRoom(room_id)))
     for chat_id in chat_idx:
