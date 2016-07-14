@@ -147,13 +147,15 @@ def echo(bot, update):
     rs = getRoomHistorySize(room_id)
     message_text = "#%d: %s" % (rs, update.message.text)
 
+    send_to_sender = False
     zaebalEgg = u'ты заебал'
     if zaebalEgg in message_text:
         message_text = u"СЛУЖЕБНОЕ СООБЩЕНИЕ #%d: Михаил пытался написать текст 'ты заебал'. Как же ты заебал, Михаил!" % rs
+        send_to_sender = True
 
     chat_idx = sorted(set(getChatsByRoom(room_id)))
     for chat_id in chat_idx:
-        if (update.message.chat_id != int(chat_id)) or (room_id == "room_/room test"):
+        if (send_to_sender or update.message.chat_id != int(chat_id)) or (room_id == "room_/room test"):
             try:
                 if update.message.sticker:
                     bot.sendSticker(int(chat_id), sticker=update.message.sticker.file_id)
