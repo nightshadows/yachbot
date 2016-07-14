@@ -120,6 +120,21 @@ def helpcommand(bot, update):
     except:
         error(bot, update, "Help")
 
+def deletecommand(bot, update, args):
+    try:
+        room_id = getRoomByChat(update)
+        comment_number = args[0]
+        msg_list_record = "mid_%s_%s" % (comment_number, room_id)
+        msg_idx = DB.Get(msg_list_record).split()
+        for msg in msg_idx:
+            ch_id, msg_id = msg.split(':')
+            try:
+                bot.editMessageText(chat_id=int(ch_id), message_id=int(msg_id), text=u"РосКомНадзор")
+            except Exception as e:
+                print e
+    except:
+        pass
+
 def ping(bot, update):
     try:
         room_id = getRoomByChat(update)
@@ -134,6 +149,9 @@ def ping(bot, update):
     except:
         error(bot, update, "Ping")
 
+def get_comment_number_text(number):
+    return "#%d: " % number
+
 def echo(bot, update):
     # get the room from the sending user, send message to all users in that room
     room_id = getRoomByChat(update)
@@ -145,28 +163,45 @@ def echo(bot, update):
         return
 
     rs = getRoomHistorySize(room_id)
-    message_text = "#%d: %s" % (rs, update.message.text)
+    message_text = get_comment_number_text(rs) + update.message.text
 
     zaebalEgg = u'ты заебал'
     if zaebalEgg in message_text:
         message_text = u"СЛУЖЕБНОЕ СООБЩЕНИЕ #%d: Михаил пытался написать текст 'ты заебал'. Как же ты заебал, Михаил!" % rs
 
     chat_idx = sorted(set(getChatsByRoom(room_id)))
+    msg_idx = []
     for chat_id in chat_idx:
         if (update.message.chat_id != int(chat_id)) or (room_id == "room_/room test"):
             try:
                 if update.message.sticker:
-                    bot.sendSticker(int(chat_id), sticker=update.message.sticker.file_id)
+                    r = bot.sendSticker(int(chat_id), sticker=update.message.sticker.file_id)
+                    try:
+                        msg_idx.append("%d:%d" % (r.chat.id, r.message_id))
+                    except:
+                        pass
                 elif update.message.photo:
-                    bot.sendPhoto(int(chat_id), photo=update.message.photo[0].file_id)
+                    r = bot.sendPhoto(int(chat_id), photo=update.message.photo[0].file_id)
+                    try:
+                        msg_idx.append("%d:%d" % (r.chat.id, r.message_id))
+                    except:
+                        pass
                 else:
-                    bot.sendMessage(int(chat_id), text=message_text)
+                    r = bot.sendMessage(int(chat_id), text=message_text)
+                    try:
+                        msg_idx.append("%d:%d" % (r.chat.id, r.message_id))
+                    except:
+                        pass
             except:
                 pass
 
     try:
         history_record = "message_%d_%s" % (rs, room_id)
         DB.Put(history_record, message_text.encode('utf-8'))
+
+        message_record = "mid_%d_%s" % (rs, room_id)
+        DB.Put(message_record, ' '.join(msg_idx))
+
         incRoomHistorySize(room_id)
     except Exception as e:
         error(bot, update, e.text)
@@ -195,6 +230,7 @@ def yachbot():
     dp.add_handler(CommandHandler("ping", ping))
     dp.add_handler(CommandHandler("history", history))
     dp.add_handler(CommandHandler("exit", exitroom))
+    dp.add_handler(CommandHandler("delete", deletecommand, pass_args=True))
     dp.add_handler(MessageHandler(filters=False, callback=echo))
     dp.add_error_handler(error)
     updater.start_polling()
