@@ -76,6 +76,26 @@ def getChatsByRoom(room_name):
     except:
         return []
 
+def getReplyByChat(update):
+    try:
+        room_id = getRoomByChat(update)
+        reply = update.message.reply_to_message
+        if not reply:
+            return None
+        comment_number = int(reply.text[1:reply.text.find(':')])
+
+        msg_list_record = "mid_%s_%s" % (comment_number, room_id)
+        msg_idx = DB.Get(msg_list_record).split()
+        result = {}
+        for msg in msg_idx:
+            ch_id, msg_id = msg.split(':')
+            result[ch_id] = int(msg_id)
+
+        return result
+    except:
+        return None
+
+
 def room(bot, update):
     if update.message.text == "/room":
         try:
@@ -173,23 +193,29 @@ def echo(bot, update):
 
     chat_idx = sorted(set(getChatsByRoom(room_id)))
     msg_idx = []
+
+    reply_dict = getReplyByChat(update)
     for chat_id in chat_idx:
+        kwargs = {}
+        if chat_id in reply_dict:
+            kwargs['reply_to_message_id'] = reply_dict[chat_id]
+
         if (send_to_sender or update.message.chat_id != int(chat_id)) or (room_id == "room_/room test"):
             try:
                 if update.message.sticker:
-                    r = bot.sendSticker(int(chat_id), sticker=update.message.sticker.file_id)
+                    r = bot.sendSticker(int(chat_id), sticker=update.message.sticker.file_id, **kwargs)
                     try:
                         msg_idx.append("%d:%d" % (r.chat.id, r.message_id))
                     except:
                         pass
                 elif update.message.photo:
-                    r = bot.sendPhoto(int(chat_id), photo=update.message.photo[0].file_id)
+                    r = bot.sendPhoto(int(chat_id), photo=update.message.photo[0].file_id, **kwargs)
                     try:
                         msg_idx.append("%d:%d" % (r.chat.id, r.message_id))
                     except:
                         pass
                 else:
-                    r = bot.sendMessage(int(chat_id), text=message_text)
+                    r = bot.sendMessage(int(chat_id), text=message_text, **kwargs)
                     try:
                         msg_idx.append("%d:%d" % (r.chat.id, r.message_id))
                     except:
