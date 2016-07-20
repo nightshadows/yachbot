@@ -76,13 +76,23 @@ def getChatsByRoom(room_name):
     except:
         return []
 
-def getReplyByChat(update):
+def getCommentNumberForReply(update):
     try:
-        room_id = getRoomByChat(update)
         reply = update.message.reply_to_message
         if not reply:
             return None
+
         comment_number = int(reply.text[1:reply.text.find(':')])
+        return comment_number
+    except:
+        return None
+
+def getReplyByChat(update):
+    try:
+        room_id = getRoomByChat(update)
+        comment_number = getCommentNumberForReply(update)
+        if not comment_number:
+            return {}
 
         msg_list_record = "mid_%s_%s" % (comment_number, room_id)
         msg_idx = DB.Get(msg_list_record).split()
@@ -93,8 +103,11 @@ def getReplyByChat(update):
 
         return result
     except:
-        return None
+        return {}
 
+def startcommand(bot, update):
+    # do nothing, this is just to supress "/start" messages in the chat
+    pass
 
 def room(bot, update):
     if update.message.text == "/room":
@@ -170,7 +183,9 @@ def ping(bot, update):
         error(bot, update, "Ping")
 
 def get_comment_number_text(number):
-    return "#%d: " % number
+    if number != None:
+        return "#%d: " % number
+    return "None"
 
 def echo(bot, update):
     # get the room from the sending user, send message to all users in that room
@@ -186,19 +201,16 @@ def echo(bot, update):
     message_text = get_comment_number_text(rs) + update.message.text
 
     send_to_sender = False
-    zaebalEgg = u'ты заебал'
-    if zaebalEgg in message_text:
-        message_text = u"СЛУЖЕБНОЕ СООБЩЕНИЕ #%d: Михаил пытался написать текст 'ты заебал'. Как же ты заебал, Михаил!" % rs
-        send_to_sender = True
-
     chat_idx = sorted(set(getChatsByRoom(room_id)))
     msg_idx = []
-
     reply_dict = getReplyByChat(update)
+    reply_number = getCommentNumberForReply(update)
+
     for chat_id in chat_idx:
         kwargs = {}
         if chat_id in reply_dict:
             kwargs['reply_to_message_id'] = reply_dict[chat_id]
+            message_text = get_comment_number_text(rs) + get_comment_number_text(reply_number) + update.message.text
 
         if (send_to_sender or update.message.chat_id != int(chat_id)) or (room_id == "room_/room test"):
             try:
@@ -254,6 +266,7 @@ def yachbot():
     updater = Updater(CONFIG.token)
     dp = updater.dispatcher
     dp.add_handler(CommandHandler("room", room))
+    dp.add_handler(CommandHandler("start", startcommand))
     dp.add_handler(CommandHandler("help", helpcommand))
     dp.add_handler(CommandHandler("ping", ping))
     dp.add_handler(CommandHandler("history", history))
