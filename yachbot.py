@@ -25,6 +25,9 @@ def read_configuration(configuration_file):
 CONFIG = read_configuration("./yachbot.cfg")
 DB = leveldb.LevelDB(CONFIG.db_location)
 
+Bans = {}
+BAN_DURATION = 10
+
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
@@ -108,6 +111,33 @@ def getReplyByChat(update):
 def startcommand(bot, update):
     # do nothing, this is just to supress "/start" messages in the chat
     pass
+
+def ban(bot, update):
+    try:
+        room_id = getRoomByChat(update)
+        rs = getRoomHistorySize(room_id)
+        mid = int(update.message.text[5:])
+        uid_record = "uid_%d_%s" % (mid, room_id)
+        uid = int(DB.Get(uid_record))
+        if not room_id in Bans:
+            Bans[room_id] = {}
+        Bans[room_id][uid] = mid + BAN_DURATION
+        print "User is banned in %s till %d" % (room_id, Bans[room_id][uid])
+    except:
+        print "Ban error"
+        pass
+
+def is_banned(update):
+    try:
+        room_id = getRoomByChat(update)
+        rs = getRoomHistorySize(room_id)
+        uid = update.message.chat_id
+        ban_val = Bans[room_id][uid]
+        if ban_val > rs:
+            return [True, ban_val]
+    except:
+        pass
+    return [False, 0]
 
 def room(bot, update):
     if update.message.text == "/room":
@@ -194,11 +224,24 @@ def echo(bot, update):
     if room_id == None:
         update.message.text = "/room yach"
         room(bot, update)
-        bot.sendMessage(update.message.chat_id, text="You were sent to room 'yach', use '/room <room name>' command to select another one.")
+        try:
+            bot.sendMessage(update.message.chat_id, text="You were sent to room 'yach', use '/room <room name>' command to select another one.")
+        except:
+            pass
         return
 
     rs = getRoomHistorySize(room_id)
     message_text = get_comment_number_text(rs) + update.message.text
+
+    no_history = False
+    banned = is_banned(update)
+    if banned[0]:
+        message_text = "User tried to write something, but he is banned for %d messages" % BAN_DURATION
+        try:
+            bot.sendMessage(update.message.chat_id, text="You are banned till %d" % banned[1])
+        except:
+            pass
+        no_history = True
 
     send_to_sender = False
     chat_idx = sorted(set(getChatsByRoom(room_id)))
@@ -210,7 +253,6 @@ def echo(bot, update):
         kwargs = {}
         if chat_id in reply_dict:
             kwargs['reply_to_message_id'] = reply_dict[chat_id]
-            message_text = get_comment_number_text(rs) + get_comment_number_text(reply_number) + update.message.text
 
         if (send_to_sender or update.message.chat_id != int(chat_id)) or (room_id == "room_/room test"):
             try:
@@ -235,16 +277,20 @@ def echo(bot, update):
             except:
                 pass
 
-    try:
-        history_record = "message_%d_%s" % (rs, room_id)
-        DB.Put(history_record, message_text.encode('utf-8'))
+    if not no_history:
+        try:
+            history_record = "message_%d_%s" % (rs, room_id)
+            DB.Put(history_record, message_text.encode('utf-8'))
+            uid_record = "uid_%d_%s" % (rs, room_id)
+            DB.Put(uid_record, str(update.message.chat_id))
 
-        message_record = "mid_%d_%s" % (rs, room_id)
-        DB.Put(message_record, ' '.join(msg_idx))
+            message_record = "mid_%d_%s" % (rs, room_id)
+            print "Message %d was sent to %s, received by %d users" % (rs, room_id, len(msg_idx))
+            DB.Put(message_record, ' '.join(msg_idx))
 
-        incRoomHistorySize(room_id)
-    except Exception as e:
-        error(bot, update, e.text)
+            incRoomHistorySize(room_id)
+        except Exception as e:
+            error(bot, update, e.text)
 
 def history(bot, update):
     try:
@@ -271,6 +317,7 @@ def yachbot():
     dp.add_handler(CommandHandler("ping", ping))
     dp.add_handler(CommandHandler("history", history))
     dp.add_handler(CommandHandler("exit", exitroom))
+    dp.add_handler(CommandHandler("ban", ban))
     dp.add_handler(CommandHandler("delete", deletecommand, pass_args=True))
     dp.add_handler(MessageHandler(filters=False, callback=echo))
     dp.add_error_handler(error)
