@@ -268,6 +268,18 @@ def echo(bot, update):
                         msg_idx.append("%d:%d" % (r.chat.id, r.message_id))
                     except:
                         pass
+                elif update.message.document:
+                    r = bot.sendDocument(int(chat_id), document=update.message.document.file_id, **kwargs)
+                    try:
+                        msg_idx.append("%d:%d" % (r.chat.id, r.message_id))
+                    except:
+                        pass
+                elif update.message.video:
+                    r = bot.sendVideo(int(chat_id), document=update.message.video.file_id, **kwargs)
+                    try:
+                        msg_idx.append("%d:%d" % (r.chat.id, r.message_id))
+                    except:
+                        pass
                 else:
                     r = bot.sendMessage(int(chat_id), text=message_text, **kwargs)
                     try:
