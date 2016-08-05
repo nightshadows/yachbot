@@ -26,7 +26,7 @@ CONFIG = read_configuration("./yachbot.cfg")
 DB = leveldb.LevelDB(CONFIG.db_location)
 
 Bans = {}
-BAN_DURATION = 10
+BAN_DURATION = 2
 
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -78,6 +78,12 @@ def getChatsByRoom(room_name):
         return DB.Get(room_name).split()
     except:
         return []
+
+def updateRoomChats(room_name, chats):
+    try:
+        DB.Put(room_name, ' '.join(chats))
+    except:
+        pass
 
 def getCommentNumberForReply(update):
     try:
@@ -230,6 +236,12 @@ def echo(bot, update):
             pass
         return
 
+    if room_id == "room_/room test":
+        try:
+            bot.editMessageText(update.message.chat_id, message_id=update.message.message_id, text=u"Получено почтой России")
+        except:
+            pass
+
     rs = getRoomHistorySize(room_id)
     message_text = get_comment_number_text(rs) + update.message.text
 
@@ -246,6 +258,7 @@ def echo(bot, update):
     send_to_sender = False
     chat_idx = sorted(set(getChatsByRoom(room_id)))
     msg_idx = []
+    nchat_idx = []
     reply_dict = getReplyByChat(update)
     reply_number = getCommentNumberForReply(update)
 
@@ -260,34 +273,43 @@ def echo(bot, update):
                     r = bot.sendSticker(int(chat_id), sticker=update.message.sticker.file_id, **kwargs)
                     try:
                         msg_idx.append("%d:%d" % (r.chat.id, r.message_id))
+                        nchat_idx.append(str(r.chat_id))
                     except:
                         pass
                 elif update.message.photo:
                     r = bot.sendPhoto(int(chat_id), photo=update.message.photo[0].file_id, **kwargs)
                     try:
                         msg_idx.append("%d:%d" % (r.chat.id, r.message_id))
+                        nchat_idx.append(str(r.chat_id))
                     except:
                         pass
                 elif update.message.document:
                     r = bot.sendDocument(int(chat_id), document=update.message.document.file_id, **kwargs)
                     try:
                         msg_idx.append("%d:%d" % (r.chat.id, r.message_id))
+                        nchat_idx.append(str(r.chat_id))
                     except:
                         pass
                 elif update.message.video:
                     r = bot.sendVideo(int(chat_id), document=update.message.video.file_id, **kwargs)
                     try:
                         msg_idx.append("%d:%d" % (r.chat.id, r.message_id))
+                        nchat_idx.append(str(r.chat_id))
                     except:
                         pass
                 else:
                     r = bot.sendMessage(int(chat_id), text=message_text, **kwargs)
                     try:
                         msg_idx.append("%d:%d" % (r.chat.id, r.message_id))
+                        nchat_idx.append(str(r.chat_id))
                     except:
                         pass
             except:
                 pass
+
+    # kick off all the chats that resulted in an error - mostly they already left the room
+    if len(nchat_idx) > 0 and len(nchat_idx) != len(chat_idx):
+        updateRoomChats(room_id, nchat_idx)
 
     if not no_history:
         try:
