@@ -24,6 +24,7 @@ def read_configuration(configuration_file):
 
 CONFIG = read_configuration("./yachbot.cfg")
 DB = leveldb.LevelDB(CONFIG.db_location)
+YACH_ROOM = "room_/room yach"
 
 Bans = {}
 BAN_DURATION = 2
@@ -115,8 +116,8 @@ def getReplyByChat(update):
         return {}
 
 def startcommand(bot, update):
-    # do nothing, this is just to supress "/start" messages in the chat
-    pass
+    update.message.text = "/room yach"
+    room(bot, update)
 
 def ban(bot, update):
     try:
@@ -183,7 +184,7 @@ def exitroom(bot, update):
         pass
 
 def helpcommand(bot, update):
-    txt = "Anonymous bot. To enter the channel use '/room <channel name>; To leave the channel '/exit'; To show the current channel name '/ping'."
+    txt = "Anonymous bot. To show bot stas type '/ping'."
     try:
         bot.sendMessage(update.message.chat_id, txt)
     except:
@@ -204,13 +205,20 @@ def deletecommand(bot, update, args):
     except:
         pass
 
+def default_room(bot, update):
+    update.message.text = "/room yach"
+    room(bot, update)
+    try:
+        bot.sendMessage(update.message.chat_id, text="You were automatically sent to room 'yach'")
+    except:
+        pass
+
 def ping(bot, update):
     try:
         room_id = getRoomByChat(update)
-
-        if room_id == None:
-            bot.sendMessage(update.message.chat_id, text="No channel, use '/room <channel name>' command to enter one")
-            return
+        if room_id != YACH_ROOM:
+            default_room(bot, update)
+            room_id = YACH_ROOM
 
         chat_idx = getChatsByRoom(room_id)
 
@@ -227,20 +235,9 @@ def echo(bot, update):
     # get the room from the sending user, send message to all users in that room
     room_id = getRoomByChat(update)
 
-    if room_id == None:
-        update.message.text = "/room yach"
-        room(bot, update)
-        try:
-            bot.sendMessage(update.message.chat_id, text="You were sent to room 'yach', use '/room <room name>' command to select another one.")
-        except:
-            pass
-        return
-
-    if room_id == "room_/room test":
-        try:
-            bot.editMessageText(update.message.chat_id, message_id=update.message.message_id, text=u"Получено почтой России")
-        except:
-            pass
+    if room_id != YACH_ROOM:
+        default_room(bot, update)
+        room_id = YACH_ROOM
 
     rs = getRoomHistorySize(room_id)
     message_text = get_comment_number_text(rs) + update.message.text
@@ -267,7 +264,7 @@ def echo(bot, update):
         if chat_id in reply_dict:
             kwargs['reply_to_message_id'] = reply_dict[chat_id]
 
-        if (send_to_sender or update.message.chat_id != int(chat_id)) or (room_id == "room_/room test"):
+        if (send_to_sender or update.message.chat_id != int(chat_id)):
             try:
                 if update.message.sticker:
                     r = bot.sendSticker(int(chat_id), sticker=update.message.sticker.file_id, **kwargs)
@@ -345,12 +342,10 @@ def error(bot, update, error):
 def yachbot():
     updater = Updater(CONFIG.token)
     dp = updater.dispatcher
-    dp.add_handler(CommandHandler("room", room))
     dp.add_handler(CommandHandler("start", startcommand))
     dp.add_handler(CommandHandler("help", helpcommand))
     dp.add_handler(CommandHandler("ping", ping))
     dp.add_handler(CommandHandler("history", history))
-    dp.add_handler(CommandHandler("exit", exitroom))
     dp.add_handler(CommandHandler("ban", ban))
     dp.add_handler(CommandHandler("delete", deletecommand, pass_args=True))
     dp.add_handler(MessageHandler(filters=False, callback=echo))
