@@ -24,7 +24,7 @@ def read_configuration(configuration_file):
 
 CONFIG = read_configuration("./yachbot.cfg")
 DB = leveldb.LevelDB(CONFIG.db_location)
-YACH_ROOM = "room_/room yach"
+ROOM_ID = 'room_/room yach'
 
 Bans = {}
 BAN_DURATION = 2
@@ -52,37 +52,33 @@ def ParseArgs():
 def log_info(text):
     logger.warn(text)
 
-def getRoomHistorySize(room_id):
-    room_size = "size_%s" % room_id
+def getRoomHistorySize():
+    room_size = "size_%s" % ROOM_ID
     try:
         return int(DB.Get(room_size))
     except:
         return 0
 
-def incRoomHistorySize(room_id):
-    room_size = "size_%s" % room_id
+def incRoomHistorySize():
+    room_size = "size_%s" % ROOM_ID
     try:
-        rs = getRoomHistorySize(room_id)
+        rs = getRoomHistorySize()
         DB.Put(room_size, str(rs + 1))
     except:
         pass
 
 def getRoomByChat(update):
-    try:
-        chat_name = "chat_%d" % update.message.chat_id
-        return DB.Get(chat_name)
-    except:
-        return None
+    return ROOM_ID
 
-def getChatsByRoom(room_name):
+def getChatsByRoom():
     try:
-        return DB.Get(room_name).split()
+        return DB.Get(ROOM_ID).split()
     except:
         return []
 
-def updateRoomChats(room_name, chats):
+def updateRoomChats(chats):
     try:
-        DB.Put(room_name, ' '.join(chats))
+        DB.Put(ROOM_ID, ' '.join(chats))
     except:
         pass
 
@@ -116,49 +112,15 @@ def getReplyByChat(update):
         return {}
 
 def startcommand(bot, update):
-    update.message.text = "/room yach"
+    # do nothing, this is just to supress "/start" messages in the chat
     room(bot, update)
-
-def ban(bot, update):
-    try:
-        room_id = getRoomByChat(update)
-        rs = getRoomHistorySize(room_id)
-        mid = int(update.message.text[5:])
-        uid_record = "uid_%d_%s" % (mid, room_id)
-        uid = int(DB.Get(uid_record))
-        if not room_id in Bans:
-            Bans[room_id] = {}
-        Bans[room_id][uid] = mid + BAN_DURATION
-        print "User is banned in %s till %d" % (room_id, Bans[room_id][uid])
-    except:
-        print "Ban error"
-        pass
-
-def is_banned(update):
-    try:
-        room_id = getRoomByChat(update)
-        rs = getRoomHistorySize(room_id)
-        uid = update.message.chat_id
-        ban_val = Bans[room_id][uid]
-        if ban_val > rs:
-            return [True, ban_val]
-    except:
-        pass
-    return [False, 0]
+    pass
 
 def room(bot, update):
-    if update.message.text == "/room":
-        try:
-            bot.sendMessage(update.message.chat_id, text="Please specify the /room name")
-        except:
-            pass
-        return
-
-    room_name = "room_%s" % update.message.text
     chat_name = "chat_%d" % update.message.chat_id
 
     try:
-        chat_idx = DB.Get(room_name).split()
+        chat_idx = DB.Get(ROOM_ID).split()
     except:
         chat_idx = []
 
@@ -167,8 +129,8 @@ def room(bot, update):
 
     exitroom(bot, update)
     chat_idx.append(str(update.message.chat_id))
-    DB.Put(room_name, ' '.join(chat_idx))
-    DB.Put(chat_name, room_name)
+    DB.Put(ROOM_ID, ' '.join(chat_idx))
+    DB.Put(chat_name, ROOM_ID)
 
     ping(bot, update)
 
@@ -184,7 +146,7 @@ def exitroom(bot, update):
         pass
 
 def helpcommand(bot, update):
-    txt = "Anonymous bot. To show bot stas type '/ping'."
+    txt = "Anonymous bot. To enter the channel use '/room <channel name>; To leave the channel '/exit'; To show the current channel name '/ping'."
     try:
         bot.sendMessage(update.message.chat_id, txt)
     except:
@@ -205,24 +167,11 @@ def deletecommand(bot, update, args):
     except:
         pass
 
-def default_room(bot, update):
-    update.message.text = "/room yach"
-    room(bot, update)
-    try:
-        bot.sendMessage(update.message.chat_id, text="You were automatically sent to room 'yach'")
-    except:
-        pass
-
 def ping(bot, update):
     try:
         room_id = getRoomByChat(update)
-        if room_id != YACH_ROOM:
-            default_room(bot, update)
-            room_id = YACH_ROOM
-
-        chat_idx = getChatsByRoom(room_id)
-
-        bot.sendMessage(update.message.chat_id, text="Channel %s, %d users here, history size is %d" % (room_id[11:], len(chat_idx), getRoomHistorySize(room_id)))
+        chat_idx = getChatsByRoom()
+        bot.sendMessage(update.message.chat_id, text="Channel %s, %d users here, history size is %d" % (room_id[11:], len(chat_idx), getRoomHistorySize()))
     except:
         error(bot, update, "Ping")
 
@@ -232,28 +181,11 @@ def get_comment_number_text(number):
     return "None"
 
 def echo(bot, update):
-    # get the room from the sending user, send message to all users in that room
-    room_id = getRoomByChat(update)
-
-    if room_id != YACH_ROOM:
-        default_room(bot, update)
-        room_id = YACH_ROOM
-
-    rs = getRoomHistorySize(room_id)
+    rs = getRoomHistorySize()
     message_text = get_comment_number_text(rs) + update.message.text
 
-    no_history = False
-    banned = is_banned(update)
-    if banned[0]:
-        message_text = "User tried to write something, but he is banned for %d messages" % BAN_DURATION
-        try:
-            bot.sendMessage(update.message.chat_id, text="You are banned till %d" % banned[1])
-        except:
-            pass
-        no_history = True
-
     send_to_sender = False
-    chat_idx = sorted(set(getChatsByRoom(room_id)))
+    chat_idx = sorted(set(getChatsByRoom()))
     msg_idx = []
     nchat_idx = []
     reply_dict = getReplyByChat(update)
@@ -306,27 +238,26 @@ def echo(bot, update):
 
     # kick off all the chats that resulted in an error - mostly they already left the room
     if len(nchat_idx) > 0 and len(nchat_idx) != len(chat_idx):
-        updateRoomChats(room_id, nchat_idx)
+        updateRoomChats(nchat_idx)
 
-    if not no_history:
-        try:
-            history_record = "message_%d_%s" % (rs, room_id)
-            DB.Put(history_record, message_text.encode('utf-8'))
-            uid_record = "uid_%d_%s" % (rs, room_id)
-            DB.Put(uid_record, str(update.message.chat_id))
+    try:
+        history_record = "message_%d_%s" % (rs, ROOM_ID)
+        DB.Put(history_record, message_text.encode('utf-8'))
+        uid_record = "uid_%d_%s" % (rs, ROOM_ID)
+        DB.Put(uid_record, str(update.message.chat_id))
 
-            message_record = "mid_%d_%s" % (rs, room_id)
-            print "Message %d was sent to %s, received by %d users" % (rs, room_id, len(msg_idx))
-            DB.Put(message_record, ' '.join(msg_idx))
+        message_record = "mid_%d_%s" % (rs, ROOM_ID)
+        print "Message %d was sent to %s, received by %d users" % (rs, ROOM_ID, len(msg_idx))
+        DB.Put(message_record, ' '.join(msg_idx))
 
-            incRoomHistorySize(room_id)
-        except Exception as e:
-            error(bot, update, e.text)
+        incRoomHistorySize()
+    except Exception as e:
+        error(bot, update, e.text)
 
 def history(bot, update):
     try:
         room_id = getRoomByChat(update)
-        rs = getRoomHistorySize(room_id)
+        rs = getRoomHistorySize()
 
         historysz = 5
         startid = max(0, rs - historysz)
@@ -346,7 +277,6 @@ def yachbot():
     dp.add_handler(CommandHandler("help", helpcommand))
     dp.add_handler(CommandHandler("ping", ping))
     dp.add_handler(CommandHandler("history", history))
-    dp.add_handler(CommandHandler("ban", ban))
     dp.add_handler(CommandHandler("delete", deletecommand, pass_args=True))
     dp.add_handler(MessageHandler(filters=False, callback=echo))
     dp.add_error_handler(error)
