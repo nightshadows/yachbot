@@ -184,19 +184,25 @@ def echo(bot, update):
     rs = getRoomHistorySize()
     message_text = get_comment_number_text(rs) + update.message.text
 
-    send_to_sender = False
+    addToChat = False
     chat_idx = sorted(set(getChatsByRoom()))
+    if not str(update.message.chat_id) in chat_idx:
+        addToChat = True
+        chat_idx.append(str(update.message.chat_id))
+        print("Added %d to chat" % update.message.chat_id)
     msg_idx = []
     nchat_idx = []
     reply_dict = getReplyByChat(update)
     reply_number = getCommentNumberForReply(update)
+
+    print("List to send: ", chat_idx)
 
     for chat_id in chat_idx:
         kwargs = {}
         if chat_id in reply_dict:
             kwargs['reply_to_message_id'] = reply_dict[chat_id]
 
-        if (send_to_sender or update.message.chat_id != int(chat_id)):
+        if (update.message.chat_id != int(chat_id)):
             try:
                 if update.message.sticker:
                     r = bot.sendSticker(int(chat_id), sticker=update.message.sticker.file_id, **kwargs)
@@ -237,7 +243,7 @@ def echo(bot, update):
                 pass
 
     # kick off all the chats that resulted in an error - mostly they already left the room
-    if len(nchat_idx) > 0 and len(nchat_idx) != len(chat_idx):
+    if addToChat or (len(nchat_idx) > 0 and len(nchat_idx) != len(chat_idx)):
         updateRoomChats(nchat_idx)
 
     try:
