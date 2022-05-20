@@ -186,12 +186,13 @@ def echo(bot, update):
 
     addToChat = False
     chat_idx = sorted(set(getChatsByRoom()))
+    nchat_idx = []
     if not str(update.message.chat_id) in chat_idx:
         addToChat = True
         chat_idx.append(str(update.message.chat_id))
+        nchat_idx.append(str(update.message.chat_id))
         print("Added %d to chat" % update.message.chat_id)
     msg_idx = []
-    nchat_idx = []
     reply_dict = getReplyByChat(update)
     reply_number = getCommentNumberForReply(update)
 
